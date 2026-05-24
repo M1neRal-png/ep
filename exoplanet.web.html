@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exoplanet Explorer</title>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { margin: 0; background-color: #030712; color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow-x: hidden; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    const COLORS = {
+      pink: "#f472b6", pinkDark: "#db2777", pinkGlow: "rgba(244,114,182,0.4)",
+      blue: "#60a5fa", blueDark: "#2563eb", blueGlow: "rgba(96,165,250,0.4)",
+      purple: "#a78bfa", purpleDark: "#7c3aed", purpleGlow: "rgba(167,139,250,0.4)",
+      cyan: "#22d3ee", bg: "#030712", surface: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.08)",
+    };
+
+    const EXOPLANETS = [
+      { id:1, name:"Kepler-452b", radius:1.63, mass:5.0, temp:265, distance:1402, star:"Kepler-452", method:"Transit", habitable:true, year:2015, type:"Super-Earth", desc:"Often called Earth's cousin, orbiting in the habitable zone of a Sun-like star." },
+      { id:2, name:"TRAPPIST-1e", radius:0.92, mass:0.77, temp:251, distance:39, star:"TRAPPIST-1", method:"Transit", habitable:true, year:2017, type:"Earth-sized", desc:"One of the most promising candidates for habitability in the TRAPPIST-1 system." },
+      { id:3, name:"HD 209458 b", radius:13.0, mass:220, temp:1130, distance:159, star:"HD 209458", method:"Transit", habitable:false, year:1999, type:"Hot Jupiter", desc:"First exoplanet confirmed by transit method, nicknamed 'Osiris'." },
+      { id:4, name:"51 Pegasi b", radius:11.2, mass:150, temp:1200, distance:50, star:"51 Pegasi", method:"Radial Velocity", habitable:false, year:1995, type:"Hot Jupiter", desc:"The first exoplanet discovered orbiting a Sun-like star." },
+      { id:5, name:"Proxima Centauri b", radius:1.1, mass:1.27, temp:234, distance:4.2, star:"Proxima Centauri", method:"Radial Velocity", habitable:true, year:2016, type:"Earth-sized", desc:"Closest known exoplanet to Earth, orbiting our nearest stellar neighbor." },
+      { id:6, name:"GJ 1214 b", radius:2.7, mass:6.5, temp:393, distance:47, star:"GJ 1214", method:"Transit", habitable:false, year:2009, type:"Mini-Neptune", desc:"A water world with a thick steamy atmosphere — a new class of planet." },
+      { id:7, name:"Kepler-186f", radius:1.17, mass:1.44, temp:188, distance:582, star:"Kepler-186", method:"Transit", habitable:true, year:2014, type:"Earth-sized", desc:"First Earth-sized planet confirmed in the habitable zone of another star." },
+      { id:8, name:"55 Cancri e", radius:1.9, mass:8.6, temp:2400, distance:41, star:"55 Cancri", method:"Transit", habitable:false, year:2004, type:"Super-Earth", desc:"A lava world with a surface possibly covered in molten silicates." },
+      { id:9, name:"WASP-17b", radius:18.5, mass:160, temp:1771, distance:1000, star:"WASP-17", method:"Transit", habitable:false, year:2009, type:"Hot Jupiter", desc:"One of the largest known exoplanets, orbiting its star in the opposite direction." },
+      { id:10, name:"K2-18b", radius:2.6, mass:8.9, temp:265, distance:124, star:"K2-18", method:"Transit", habitable:true, year:2015, type:"Mini-Neptune", desc:"A temperate sub-Neptune with water vapor detected in its atmosphere." },
+    ];
+
+    const QUIZ_QUESTIONS = [
+      { q:"Which method detects planets by measuring starlight dips?", options:["Radial Velocity","Direct Imaging","Transit Method","Gravitational Lensing"], correct:2, xp:100, fact:"The Transit Method watches for periodic dimming as a planet crosses its star." },
+      { q:"What temperature range defines Earth's liquid water habitable zone?", options:["0–50 K","100–200 K","273–373 K","1000–2000 K"], correct:2, xp:120, fact:"Liquid water exists between 273 K (0°C) and 373 K (100°C) at sea level pressure." },
+      { q:"Which exoplanet is closest to Earth?", options:["Kepler-452b","TRAPPIST-1e","Proxima Centauri b","HD 209458 b"], correct:2, xp:100, fact:"Proxima Centauri b is just 4.2 light-years away, orbiting our nearest stellar neighbor." },
+      { q:"What does 'radial velocity' measure to find planets?", options:["Planet brightness","Star wobble","Orbital period","Planet color"], correct:1, xp:110, fact:"The gravitational pull of a planet causes its host star to wobble — we measure this Doppler shift." },
+      { q:"A 'Hot Jupiter' is characterized by:", options:["Low temperature far from star","Earth-like conditions","High mass orbiting very close to its star","Rocky surface with oceans"], correct:2, xp:90, fact:"Hot Jupiters are gas giants so close to their star that a year lasts only days." },
+      { q:"The TRAPPIST-1 system has how many potentially habitable planets?", options:["1","2","3","5"], correct:2, xp:130, fact:"TRAPPIST-1 has 3 planets (e, f, g) in or near the habitable zone around this ultra-cool dwarf star." },
+      { q:"Which NASA mission discovered the most exoplanets?", options:["Hubble","Voyager","Kepler/K2","James Webb"], correct:2, xp:110, fact:"The Kepler Space Telescope confirmed over 2,600 exoplanets during its 9-year mission." },
+      { q:"What year was the first exoplanet around a Sun-like star discovered?", options:["1985","1992","1995","2001"], correct:2, xp:120, fact:"51 Pegasi b was discovered in 1995 by Michel Mayor and Didier Queloz, who won the 2019 Nobel Prize." },
+    ];
+
+    const BADGES = [
+      { id:"first", icon:"🚀", name:"First Contact", desc:"Answered your first question" },
+      { id:"streak3", icon:"🔥", name:"On Fire", desc:"3 correct in a row" },
+      { id:"perfect", icon:"⭐", name:"Star Navigator", desc:"Quiz complete with perfect score" },
+      { id:"speed", icon:"⚡", name:"Warp Speed", desc:"Answered in under 5 seconds" },
+      { id:"explorer", icon:"🌌", name:"Galaxy Explorer", desc:"Completed all quiz questions" },
+    ];
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+    function StarField() {
+      const canvasRef = useRef(null);
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        let raf;
+        const stars = Array.from({ length: 200 }, () => ({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          r: Math.random() * 1.5 + 0.2,
+          speed: Math.random() * 0.15 + 0.03,
+          opacity: Math.random() * 0.8 + 0.2,
+          twinkle: Math.random() * Math.PI * 2,
+        }));
+        const resize = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resize();
+        window.addEventListener("resize", resize);
+        const draw = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const t = Date.now() * 0.001;
+          stars.forEach(s => {
+            s.y += s.speed;
+            if (s.y > canvas.height) { s.y = 0; s.x = Math.random() * canvas.width; }
+            const op = s.opacity * (0.6 + 0.4 * Math.sin(t * 1.5 + s.twinkle));
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${op})`;
+            ctx.fill();
+          });
+          raf = requestAnimationFrame(draw);
+        };
+        draw();
+        return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+      }, []);
+      return <canvas ref={canvasRef} style={{ position:"fixed", inset:0, width:"100vw", height:"100vh", pointerEvents:"none", zIndex:0 }} />;
+    }
+
+    function OrbitCanvas({ distance, radius, speed, temp, showHZ }) {
+      const canvasRef = useRef(null);
+      const angleRef = useRef(0);
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        let raf;
+        const W = canvas.width = 400;
+        const H = canvas.height = 400;
+        const cx = W / 2, cy = H / 2;
+        const starR = 28;
+        const orbitR = clamp(distance * 1.4, 60, 170);
+        const planetR = clamp(radius * 5, 5, 28);
+        const draw = () => {
+          ctx.clearRect(0, 0, W, H);
+          if (showHZ) {
+            const g = ctx.createRadialGradient(cx, cy, 75, cx, cy, 130);
+            g.addColorStop(0, "rgba(74,222,128,0)");
+            g.addColorStop(0.3, "rgba(74,222,128,0.13)");
+            g.addColorStop(0.7, "rgba(74,222,128,0.1)");
+            g.addColorStop(1, "rgba(74,222,128,0)");
+            ctx.beginPath(); ctx.arc(cx, cy, 130, 0, Math.PI * 2);
+            ctx.fillStyle = g; ctx.fill();
+          }
+          const starColor = temp > 1000 ? [255,120,50] : temp > 300 ? [255,200,80] : [120,180,255];
+          const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, starR * 2.5);
+          sg.addColorStop(0, `rgba(${starColor},1)`);
+          sg.addColorStop(0.4, `rgba(${starColor},0.5)`);
+          sg.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.beginPath(); ctx.arc(cx, cy, starR * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = sg; ctx.fill();
+          ctx.beginPath(); ctx.arc(cx, cy, starR, 0, Math.PI * 2);
+          ctx.fillStyle = `rgb(${starColor})`; ctx.fill();
+          ctx.beginPath(); ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1;
+          ctx.setLineDash([4,6]); ctx.stroke(); ctx.setLineDash([]);
+          angleRef.current += (speed * 0.008);
+          const px = cx + orbitR * Math.cos(angleRef.current);
+          const py = cy + orbitR * Math.sin(angleRef.current);
+          let pColor;
+          if (temp < 200) pColor = [100,150,255];
+          else if (temp < 350) pColor = [74,200,130];
+          else if (temp < 700) pColor = [255,180,60];
+          else pColor = [255,80,40];
+          const pg = ctx.createRadialGradient(px-planetR*0.3, py-planetR*0.3, 0, px, py, planetR);
+          pg.addColorStop(0, `rgb(${pColor.map(c=>Math.min(255,c+80)).join(',')})`);
+          pg.addColorStop(1, `rgb(${pColor.join(',')})`);
+          ctx.beginPath(); ctx.arc(px, py, planetR, 0, Math.PI * 2);
+          ctx.fillStyle = pg; ctx.fill();
+          const pGlow = ctx.createRadialGradient(px, py, planetR, px, py, planetR * 2.5);
+          pGlow.addColorStop(0, `rgba(${pColor.join(',')},0.3)`);
+          pGlow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.beginPath(); ctx.arc(px, py, planetR * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = pGlow; ctx.fill();
+          raf = requestAnimationFrame(draw);
+        };
+        draw();
+        return () => cancelAnimationFrame(raf);
+      }, [distance, radius, speed, temp, showHZ]);
+      return <canvas ref={canvasRef} width={400} height={400} style={{ width:"100%", maxWidth:400, borderRadius:16 }} />;
+    }
+
+    function GlowBtn({ children, onClick, color = COLORS.purple, style = {}, small }) {
+      const [hov, setHov] = useState(false);
+      return (
+        <button
+          onClick={onClick}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{
+            background: hov ? color : "transparent",
+            border: `1px solid ${color}`,
+            color: hov ? "#fff" : color,
+            borderRadius: 999,
+            padding: small ? "6px 16px" : "10px 28px",
+            fontSize: small ? 13 : 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.25s ease",
+            boxShadow: hov ? `0 0 20px ${color}88` : "none",
+            letterSpacing: "0.03em",
+            ...style,
+          }}
+        >
+          {children}
+        </button>
+      );
+    }
+
+    function GlassCard({ children, style = {}, glow, onClick }) {
+      return (
+        <div onClick={onClick} style={{
+          background: "rgba(255,255,255,0.04)",
+          border: `1px solid ${glow ? glow + "44" : "rgba(255,255,255,0.08)"}`,
+          borderRadius: 20,
+          padding: "24px",
+          backdropFilter: "blur(12px)",
+          boxShadow: glow ? `0 0 30px ${glow}22` : "none",
+          transition: "all 0.3s ease",
+          ...style,
+        }}>
+          {children}
+        </div>
+      );
+    }
+
+    function NavBar({ activeSection, setActiveSection }) {
+      const navItems = ["Home","Explore","Learn","Simulator","Quiz","Stats","About"];
+      return (
+        <nav style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+          background: "rgba(3,7,18,0.85)", backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          padding: "0 24px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", height: 64,
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={()=>setActiveSection("Home")}>
+            <span style={{ fontSize:24 }}>🪐</span>
+            <span style={{ fontSize:16, fontWeight:700, background:`linear-gradient(135deg,${COLORS.pink},${COLORS.purple})`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+              ExoplanetExplorer
+            </span>
+          </div>
+          <div style={{ display:"flex", gap:4, alignItems:"center", overflowX: "auto" }}>
+            {navItems.map(item => (
+              <button key={item} onClick={()=>setActiveSection(item)} style={{
+                background: activeSection===item ? "rgba(167,139,250,0.15)" : "transparent",
+                border: "none", color: activeSection===item ? COLORS.purple : "rgba(255,255,255,0.6)",
+                padding:"6px 14px", borderRadius:99, cursor:"pointer", fontSize:13.5,
+                fontWeight: activeSection===item ? 600 : 400, transition:"all 0.2s",
+              }}>{item}</button>
+            ))}
+          </div>
+        </nav>
+      );
+    }
+
+    function HeroSection({ setActiveSection }) {
+      const [count, setCount] = useState(0);
+      useEffect(() => {
+        let n = 0;
+        const id = setInterval(() => { n += 47; if (n >= 5500) { setCount(5500); clearInterval(id); } else setCount(n); }, 16);
+        return () => clearInterval(id);
+      }, []);
+
+      return (
+        <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", textAlign:"center", padding:"80px 24px 40px", position:"relative" }}>
+          <div style={{ position:"absolute", top:"20%", left:"50%", transform:"translate(-50%,-50%)", width:600, height:400, background:"radial-gradient(ellipse, rgba(167,139,250,0.15) 0%, rgba(96,165,250,0.08) 40%, transparent 70%)", borderRadius:"50%", pointerEvents:"none" }} />
+          <div style={{ position:"relative", zIndex:1 }}>
+            <div style={{ display:"inline-block", background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.3)", borderRadius:99, padding:"6px 18px", fontSize:12, color:COLORS.purple, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:24 }}>
+              🛸 NASA-Inspired Educational Platform
+            </div>
+            <h1 style={{ fontSize:"clamp(2.5rem,7vw,5rem)", fontWeight:800, lineHeight:1.1, margin:"0 0 20px", letterSpacing:"-0.02em" }}>
+              <span style={{ background:`linear-gradient(135deg,#fff 0%,${COLORS.purple} 50%,${COLORS.pink} 100%)`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Discover Worlds</span><br/>
+              <span style={{ background:`linear-gradient(135deg,${COLORS.blue} 0%,${COLORS.cyan} 100%)`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Beyond Our Sun</span>
+            </h1>
+            <p style={{ fontSize:18, color:"rgba(255,255,255,0.65)", maxWidth:560, margin:"0 auto 40px", lineHeight:1.7 }}>
+              Explore thousands of exoplanets, simulate alien worlds, and hunt for life beyond Earth — through interactive science and gamified learning.
+            </p>
+            <div style={{ display:"flex", gap:16, justifyContent:"center", flexWrap:"wrap", marginBottom:60 }}>
+              <GlowBtn color={COLORS.purple} onClick={()=>setActiveSection("Explore")}>🌌 Start Exploring</GlowBtn>
+              <GlowBtn color={COLORS.pink} onClick={()=>setActiveSection("Quiz")}>🎮 Play the Quiz</GlowBtn>
+            </div>
+            <div style={{ display:"flex", gap:32, justifyContent:"center", flexWrap:"wrap" }}>
+              {[
+                { label:"Confirmed Exoplanets", value: count.toLocaleString()+"+", color:COLORS.purple },
+                { label:"Host Stars", value:"4,100+", color:COLORS.blue },
+                { label:"Habitable Candidates", value:"50+", color:"#4ade80" },
+                { label:"Light-Years Explored", value:"∞", color:COLORS.pink },
+              ].map(s => (
+                <div key={s.label} style={{ textAlign:"center" }}>
+                  <div style={{ fontSize:28, fontWeight:800, color:s.color }}>{s.value}</div>
+                  <div style={{ fontSize:12, color:"rgba(255,255,255,0.45)", letterSpacing:"0.06em" }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ExploreSection() {
+      const [search, setSearch] = useState("");
+      const [filter, setFilter] = useState("All");
+      const [selected, setSelected] = useState(null);
+      const [sortBy, setSortBy] = useState("name");
+      const [planetsData, setPlanetsData] = useState(EXOPLANETS);
+      const [isLoading, setIsLoading] = useState(true);
+
+      useEffect(() => {
+        const fetchNASAData = async () => {
+          try {
+            // Using a CORS proxy to allow local file fetching
+            const nasaApiUrl = encodeURIComponent("https://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI?table=pscomppars&select=pl_name,pl_rade,pl_bmasse,pl_eqt,sy_dist,hostname,discoverymethod,disc_year&where=pl_rade>0&format=json");
+            const proxyUrl = `https://api.allorigins.win/raw?url=${nasaApiUrl}`;
+            
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("NASA API connection failed");
+            
+            const data = await response.json();
+            
+            const livePlanets = data.slice(0, 100).map((p, index) => {
+              let type = "Unknown";
+              if (p.pl_rade < 1.25) type = "Earth-sized";
+              else if (p.pl_rade < 2.0) type = "Super-Earth";
+              else if (p.pl_rade < 6.0) type = "Mini-Neptune";
+              else type = "Hot Jupiter";
+              const temp = p.pl_eqt || 0;
+              const isHabitable = temp > 200 && temp < 320 && p.pl_rade < 2.5;
+              return {
+                id: `nasa-${index}`, name: p.pl_name || "Unknown World",
+                radius: p.pl_rade ? p.pl_rade.toFixed(2) : "?", mass: p.pl_bmasse ? p.pl_bmasse.toFixed(2) : "?",
+                temp: temp ? Math.round(temp) : "?", distance: p.sy_dist ? Math.round(p.sy_dist * 3.26156) : "?",
+                star: p.hostname || "Unknown Star", method: p.discoverymethod || "Unknown",
+                habitable: isHabitable, year: p.disc_year || "Unknown", type: type,
+                desc: `A ${type} exoplanet discovered around the star ${p.hostname || "an unknown star"} in ${p.disc_year || "an unknown year"} using the ${p.discoverymethod || "unknown"} method. Data sourced live from the NASA Exoplanet Archive.`
+              };
+            });
+            setPlanetsData([...EXOPLANETS, ...livePlanets]);
+          } catch (error) {
+            console.error("Using offline mock data. API Error:", error);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        fetchNASAData();
+      }, []);
+
+      const types = ["All","Earth-sized","Super-Earth","Mini-Neptune","Hot Jupiter"];
+      const filtered = planetsData.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.star.toLowerCase().includes(search.toLowerCase());
+        const matchFilter = filter === "All" || p.type === filter;
+        return matchSearch && matchFilter;
+      }).sort((a,b) => {
+        if (sortBy==="name") return a.name.localeCompare(b.name);
+        if (sortBy==="distance") return (parseFloat(a.distance) || 99999) - (parseFloat(b.distance) || 99999);
+        if (sortBy==="temp") return (parseFloat(a.temp) || 0) - (parseFloat(b.temp) || 0);
+        return 0;
+      });
+
+      return (
+        <div style={{ padding:"40px 24px", maxWidth:1100, margin:"0 auto" }}>
+          <SectionHeader title="Exoplanet Database" subtitle="Browse confirmed worlds pulled directly from NASA's live archive" />
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:24 }}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search planets or stars..." style={{ flex:1, minWidth:200, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"10px 16px", color:"#fff", fontSize:14, outline:"none" }} />
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"10px 14px", color:"#fff", fontSize:13, cursor:"pointer" }}>
+              <option value="name" style={{background:"#1a1a2e"}}>Sort: Name</option>
+              <option value="distance" style={{background:"#1a1a2e"}}>Sort: Distance</option>
+              <option value="temp" style={{background:"#1a1a2e"}}>Sort: Temperature</option>
+            </select>
+          </div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:32 }}>
+            {types.map(t => (
+              <button key={t} onClick={()=>setFilter(t)} style={{
+                background: filter===t ? COLORS.purple : "rgba(255,255,255,0.05)",
+                border: `1px solid ${filter===t ? COLORS.purple : "rgba(255,255,255,0.1)"}`,
+                color: filter===t ? "#fff" : "rgba(255,255,255,0.6)",
+                borderRadius:99, padding:"5px 16px", fontSize:13, cursor:"pointer", transition:"all 0.2s",
+              }}>{t}</button>
+            ))}
+          </div>
+          {isLoading ? (
+            <div style={{ textAlign: "center", padding: "40px", color: COLORS.purple }}>
+              <div style={{ fontSize: 32, animation: "spin 2s linear infinite", display: "inline-block" }}>🔭</div>
+              <div style={{ marginTop: 12, fontSize: 14, letterSpacing: "0.1em" }}>FETCHING LIVE DATA FROM NASA...</div>
+              <style>{"@keyframes spin { 100% { transform: rotate(360deg); } }"}</style>
+            </div>
+          ) : (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:16 }}>
+              {filtered.map(p => <PlanetCard key={p.id} planet={p} onSelect={setSelected} />)}
+            </div>
+          )}
+          {selected && <PlanetModal planet={selected} onClose={()=>setSelected(null)} />}
+        </div>
+      );
+    }
+
+    function PlanetCard({ planet, onSelect }) {
+      const [hov, setHov] = useState(false);
+      const typeColors = { "Earth-sized":"#4ade80","Super-Earth":COLORS.blue,"Mini-Neptune":COLORS.purple,"Hot Jupiter":COLORS.pink };
+      const c = typeColors[planet.type] || COLORS.purple;
+      return (
+        <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={()=>onSelect(planet)}
+          style={{
+            background: hov ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)", border: `1px solid ${hov ? c+"66" : "rgba(255,255,255,0.08)"}`,
+            borderRadius:16, padding:20, cursor:"pointer", transition:"all 0.3s ease",
+            boxShadow: hov ? `0 8px 32px ${c}22` : "none", transform: hov ? "translateY(-3px)" : "none",
+          }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14 }}>
+            <PlanetIcon planet={planet} size={48} />
+            <div>
+              <div style={{ fontSize:15, fontWeight:700, color:"#fff", marginBottom:2 }}>{planet.name}</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.5)" }}>⭐ {planet.star}</div>
+            </div>
+            {planet.habitable && <div style={{ marginLeft:"auto", fontSize:18 }} title="Potentially Habitable">🌱</div>}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
+            {[
+              { label:"Radius", value:`${planet.radius}× Earth` }, { label:"Temp", value:`${planet.temp} K` },
+              { label:"Distance", value:`${planet.distance} ly` }, { label:"Method", value:planet.method },
+            ].map(item => (
+              <div key={item.label}>
+                <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.08em" }}>{item.label}</div>
+                <div style={{ fontSize:13, color:"rgba(255,255,255,0.85)", fontWeight:500 }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ fontSize:11, background:`${c}22`, color:c, border:`1px solid ${c}44`, borderRadius:99, padding:"3px 10px" }}>{planet.type}</span>
+            <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)" }}>Disc. {planet.year}</span>
+          </div>
+        </div>
+      );
+    }
+
+    function PlanetIcon({ planet, size=40 }) {
+      const temp = parseFloat(planet.temp) || 0;
+      const colors = temp > 1000 ? ["#ff6030","#ff9050"] : temp > 300 ? ["#fbb040","#f97316"] : planet.habitable ? ["#34d399","#059669"] : ["#818cf8","#4f46e5"];
+      return <div style={{ width:size, height:size, borderRadius:"50%", background:`radial-gradient(circle at 35% 35%, ${colors[0]}, ${colors[1]})`, boxShadow:`0 0 ${size/2}px ${colors[0]}55`, flexShrink:0 }} />;
+    }
+
+    function PlanetModal({ planet, onClose }) {
+      return (
+        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }} onClick={onClose}>
+          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(8px)" }} />
+          <GlassCard style={{ maxWidth:480, width:"100%", position:"relative", zIndex:1 }} glow={COLORS.purple} onClick={e=>e.stopPropagation()}>
+            <button onClick={onClose} style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"rgba(255,255,255,0.5)", fontSize:20, cursor:"pointer" }}>✕</button>
+            <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:20 }}>
+              <PlanetIcon planet={planet} size={72} />
+              <div>
+                <h2 style={{ fontSize:22, fontWeight:700, color:"#fff", margin:0 }}>{planet.name}</h2>
+                <div style={{ color:"rgba(255,255,255,0.5)", fontSize:14 }}>Host: {planet.star} · Disc. {planet.year}</div>
+              </div>
+            </div>
+            <p style={{ color:"rgba(255,255,255,0.7)", lineHeight:1.7, marginBottom:20 }}>{planet.desc}</p>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {[
+                {label:"Radius",value:`${planet.radius}× Earth`,icon:"📏"}, {label:"Mass",value:`${planet.mass}× Earth`,icon:"⚖️"},
+                {label:"Temperature",value:`${planet.temp} K`,icon:"🌡️"}, {label:"Distance",value:`${planet.distance} light-years`,icon:"📡"},
+                {label:"Discovery Method",value:planet.method,icon:"🔭"}, {label:"Habitability",value:planet.habitable?"Potentially Habitable":"Not Habitable",icon:planet.habitable?"🌱":"❌"},
+              ].map(d => (
+                <div key={d.label} style={{ background:"rgba(255,255,255,0.05)", borderRadius:10, padding:12 }}>
+                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginBottom:4 }}>{d.icon} {d.label}</div>
+                  <div style={{ fontSize:14, color:"#fff", fontWeight:600 }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        </div>
+      );
+    }
+
+    function LearnSection() {
+      const [activeTab, setActiveTab] = useState(0);
+      const tabs = [
+        { title:"What are Exoplanets?", icon:"🌍", color:COLORS.blue }, { title:"Transit Method", icon:"✨", color:COLORS.purple },
+        { title:"Radial Velocity", icon:"📡", color:COLORS.pink }, { title:"Habitable Zone", icon:"🌱", color:"#4ade80" },
+        { title:"Planet Types", icon:"🪐", color:COLORS.cyan }, { title:"Search for Life", icon:"👽", color:"#fbbf24" },
+      ];
+      const content = [
+        { heading:"Extrasolar Planets", body:"An exoplanet is any planet that orbits a star outside our Solar System. Since 1995, astronomers have confirmed over 5,500 exoplanets. They come in astonishing variety: scorching gas giants, frozen super-Earths, lava worlds, and potentially Earth-like rocky worlds.", visual:"🌌" },
+        { heading:"The Transit Method", body:"When a planet passes in front of its star, it blocks a small fraction of starlight. By analyzing these dips, astronomers determine planet size and orbital period. Kepler and James Webb use this method.", visual:"⭐" },
+        { heading:"Radial Velocity", body:"Stars aren't perfectly stationary — an orbiting planet tugs on its star, causing it to 'wobble'. Measuring this Doppler shift reveals planet mass and orbit.", visual:"📡" },
+        { heading:"The Habitable Zone", body:"The 'Goldilocks zone' is the range of distances where liquid water could theoretically exist on a surface — not too hot, not too cold. The presence of liquid water is considered the primary prerequisite for life.", visual:"🌱" },
+        { heading:"Planet Types", body:"Exoplanets defy our Solar System's categories. Types include Earth-sized, Super-Earths, Mini-Neptunes, Hot Jupiters, Cold Jupiters, Ocean worlds, and even Diamond planets.", visual:"🪐" },
+        { heading:"The Search for Life", body:"Scientists look for biosignatures: oxygen, ozone, methane, and water vapor. The James Webb telescope is actively searching these signs on planets like TRAPPIST-1.", visual:"👽" },
+      ];
+      return (
+        <div style={{ padding:"40px 24px", maxWidth:1000, margin:"0 auto" }}>
+          <SectionHeader title="Space Academy" subtitle="Deep-dive educational modules on exoplanet science" />
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:32 }}>
+            {tabs.map((t,i) => (
+              <button key={i} onClick={()=>setActiveTab(i)} style={{ background: activeTab===i ? `${t.color}22` : "rgba(255,255,255,0.04)", border: `1px solid ${activeTab===i ? t.color+"66" : "rgba(255,255,255,0.08)"}`, color: activeTab===i ? t.color : "rgba(255,255,255,0.55)", borderRadius:12, padding:"8px 16px", fontSize:13, cursor:"pointer", fontWeight: activeTab===i ? 600 : 400, transition:"all 0.2s" }}>{t.icon} {t.title}</button>
+            ))}
+          </div>
+          <GlassCard glow={tabs[activeTab].color}>
+            <div style={{ display:"flex", gap:24, flexWrap:"wrap" }}>
+              <div style={{ flex:1, minWidth:250 }}>
+                <h2 style={{ fontSize:22, fontWeight:700, color:tabs[activeTab].color, marginBottom:16 }}>{content[activeTab].heading}</h2>
+                <p style={{ color:"rgba(255,255,255,0.75)", lineHeight:1.8, fontSize:15 }}>{content[activeTab].body}</p>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minWidth:120, fontSize:80 }}>{content[activeTab].visual}</div>
+            </div>
+          </GlassCard>
+        </div>
+      );
+    }
+
+    function SimulatorSection() {
+      const [distance, setDistance] = useState(50); const [radius, setRadius] = useState(1);
+      const [temp, setTemp] = useState(288); const [speed, setSpeed] = useState(3);
+      const isHabitable = temp >= 200 && temp <= 400 && radius >= 0.5 && radius <= 2.5 && distance >= 30 && distance <= 80;
+      let score = 100;
+      if (temp < 200 || temp > 400) score -= Math.min(50, Math.abs(temp - 300) / 6);
+      if (radius < 0.5 || radius > 2.5) score -= 30;
+      if (distance < 30 || distance > 80) score -= Math.min(40, Math.abs(distance - 55) / 2);
+      const habitScore = Math.max(0, Math.round(score));
+
+      return (
+        <div style={{ padding:"40px 24px", maxWidth:1000, margin:"0 auto" }}>
+          <SectionHeader title="World Builder Simulator" subtitle="Adjust planetary parameters and discover if your world can support life" />
+          <div style={{ display:"flex", gap:24, flexWrap:"wrap" }}>
+            <GlassCard style={{ flex:1, minWidth:260 }}>
+              <h3 style={{ color:COLORS.purple, fontSize:16, fontWeight:600, marginBottom:20 }}>🎛️ Planetary Controls</h3>
+              {[ { label:"Distance from Star", unit:"AU units", value:distance, set:setDistance, min:10, max:150, color:COLORS.blue }, { label:"Planet Radius", unit:"× Earth", value:radius, set:setRadius, min:0.3, max:5, step:0.1, color:COLORS.purple }, { label:"Surface Temperature", unit:"Kelvin", value:temp, set:setTemp, min:50, max:2000, color:COLORS.pink }, { label:"Orbital Speed", unit:"× Earth speed", value:speed, set:setSpeed, min:0.5, max:10, step:0.1, color:COLORS.cyan } ].map(ctrl => (
+                <div key={ctrl.label} style={{ marginBottom:20 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={{ fontSize:13, color:"rgba(255,255,255,0.7)" }}>{ctrl.label}</span>
+                    <span style={{ fontSize:13, fontWeight:600, color:ctrl.color }}>{+ctrl.value} {ctrl.unit}</span>
+                  </div>
+                  <input type="range" min={ctrl.min} max={ctrl.max} step={ctrl.step||1} value={ctrl.value} onChange={e=>ctrl.set(+e.target.value)} style={{ width:"100%", accentColor:ctrl.color }} />
+                </div>
+              ))}
+              <div style={{ marginTop:16, background:"rgba(0,0,0,0.3)", borderRadius:12, padding:16, border:`1px solid ${isHabitable ? "#4ade8044":"rgba(255,80,80,0.3)"}` }}>
+                <div style={{ fontSize:12, color:"rgba(255,255,255,0.5)", marginBottom:8 }}>LIFE POSSIBILITY SCORE</div>
+                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ fontSize:28, fontWeight:800, color:habitScore>60?"#4ade80":habitScore>30?COLORS.pink:"#f87171" }}>{habitScore}%</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ height:8, background:"rgba(255,255,255,0.1)", borderRadius:99, overflow:"hidden" }}><div style={{ height:"100%", width:`${habitScore}%`, background:`linear-gradient(90deg,#f87171,#4ade80)`, borderRadius:99, transition:"width 0.5s ease" }} /></div>
+                    <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginTop:4 }}>{isHabitable ? "🌱 Conditions may support life!" : "⚠️ Conditions are hostile to life"}</div>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard style={{ flex:1, minWidth:300, display:"flex", flexDirection:"column", alignItems:"center" }}>
+              <h3 style={{ color:COLORS.blue, fontSize:16, fontWeight:600, marginBottom:16 }}>🔭 Orbit Visualization</h3>
+              <OrbitCanvas distance={distance} radius={radius} temp={temp} speed={speed} showHZ />
+            </GlassCard>
+          </div>
+        </div>
+      );
+    }
+
+    function QuizSection() {
+      const [phase, setPhase] = useState("lobby"); const [qIdx, setQIdx] = useState(0);
+      const [score, setScore] = useState(0); const [xp, setXp] = useState(0);
+      const [selected, setSelected] = useState(null); const [answered, setAnswered] = useState(false);
+      const [timer, setTimer] = useState(15); const [streak, setStreak] = useState(0);
+      const [combo, setCombo] = useState(1); const timerRef = useRef(null);
+
+      const q = QUIZ_QUESTIONS[qIdx];
+      const startQuiz = () => { setPhase("playing"); setQIdx(0); setScore(0); setXp(0); setStreak(0); setCombo(1); startTimer(); };
+      const startTimer = useCallback(() => {
+        setTimer(15); clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => { setTimer(t => { if (t <= 1) { clearInterval(timerRef.current); handleAnswer(null, true); return 0; } return t - 1; }); }, 1000);
+      }, []);
+
+      const handleAnswer = (optIdx) => {
+        if (answered) return;
+        clearInterval(timerRef.current); setSelected(optIdx); setAnswered(true);
+        const isCorrect = optIdx === q.correct;
+        if (isCorrect) { setStreak(s=>s+1); setCombo(c=>Math.min(c+0.5, 4)); setScore(s=>s+1); setXp(x=>x+Math.round(q.xp*combo)); } else { setStreak(0); setCombo(1); }
+      };
+
+      const nextQuestion = () => { if (qIdx < QUIZ_QUESTIONS.length - 1) { setQIdx(i=>i+1); setSelected(null); setAnswered(false); setTimeout(startTimer, 100); } else { setPhase("result"); } };
+      useEffect(() => { return () => clearInterval(timerRef.current); }, []);
+
+      if (phase === "lobby") return <div style={{ textAlign:"center", padding:"40px 24px" }}><h1 style={{fontSize:36}}>Planet Hunter Mission</h1><GlowBtn onClick={startQuiz}>Launch Mission</GlowBtn></div>;
+      if (phase === "result") return <div style={{ textAlign:"center", padding:"40px 24px" }}><h1 style={{fontSize:36}}>Mission Complete!</h1><h2>Score: {score}/{QUIZ_QUESTIONS.length}</h2><GlowBtn onClick={()=>setPhase("lobby")}>Play Again</GlowBtn></div>;
+
+      return (
+        <div style={{ padding:"40px 24px", maxWidth:780, margin:"0 auto" }}>
+          <div style={{ display:"flex", gap:12, marginBottom:24, alignItems:"center", flexWrap:"wrap" }}>
+             <div style={{flex:1, display:"flex", gap:12}}>
+               <div style={{ background:`${COLORS.purple}15`, border:`1px solid ${COLORS.purple}44`, borderRadius:99, padding:"5px 14px", color:COLORS.purple }}>XP: {xp}</div>
+               <div style={{ background:`#4ade8015`, border:`1px solid #4ade8044`, borderRadius:99, padding:"5px 14px", color:"#4ade80" }}>Score: {score}/{qIdx}</div>
+             </div>
+             <div style={{ fontSize:24, fontWeight:700, color:timer>4?"#fff":"#f87171" }}>⏱️ {timer}s</div>
+          </div>
+          <GlassCard glow={COLORS.purple} style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, color:COLORS.purple, textTransform:"uppercase", marginBottom:12 }}>🛸 Question {qIdx+1} of {QUIZ_QUESTIONS.length}</div>
+            <h2 style={{ fontSize:20, fontWeight:700, color:"#fff", margin:0 }}>{q.q}</h2>
+          </GlassCard>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
+            {q.options.map((opt,i) => {
+              const isCorrect = i === q.correct; const isSelected = i === selected;
+              let bg = "rgba(255,255,255,0.05)", border = "rgba(255,255,255,0.12)", color = "rgba(255,255,255,0.8)";
+              if (answered) { if (isCorrect) { bg="rgba(74,222,128,0.15)"; border="#4ade80"; color="#4ade80"; } else if (isSelected) { bg="rgba(248,113,113,0.15)"; border="#f87171"; color="#f87171"; } }
+              return <button key={i} onClick={()=>handleAnswer(i)} disabled={answered} style={{ background:bg, border:`1px solid ${border}`, borderRadius:12, padding:"14px 18px", color, cursor:answered?"default":"pointer", textAlign:"left", fontSize:14 }}>{opt}</button>;
+            })}
+          </div>
+          {answered && (
+            <GlassCard style={{ borderColor:selected===q.correct?"#4ade8044":"rgba(248,113,113,0.3)" }}>
+              <div style={{ fontSize:14, color:"rgba(255,255,255,0.8)", marginBottom:12 }}>{selected===q.correct ? "✅ Correct! " : "❌ Not quite. "}{q.fact}</div>
+              <GlowBtn color={COLORS.purple} onClick={nextQuestion}>{qIdx<QUIZ_QUESTIONS.length-1?"Next Question →":"See Results 🏆"}</GlowBtn>
+            </GlassCard>
+          )}
+        </div>
+      );
+    }
+
+    function StatsSection() {
+      return <div style={{ padding:"40px 24px", maxWidth:1000, margin:"0 auto", textAlign:"center" }}><SectionHeader title="Exoplanet Statistics" subtitle="Over 5,500 exoplanets have been confirmed to date across 4,100+ star systems." /><div style={{ fontSize:60 }}>📊🪐</div></div>;
+    }
+    function AboutSection() {
+      return <div style={{ padding:"40px 24px", maxWidth:1000, margin:"0 auto", textAlign:"center" }}><SectionHeader title="About This Project" subtitle="Built with React & Live NASA Data." /><p>Created by Radhwa Haifa Dzakira, Selpi Yanti, and Fathirahim Maulaya</p></div>;
+    }
+
+    function SectionHeader({ title, subtitle }) {
+      return <div style={{ textAlign:"center", marginBottom:40 }}><h1 style={{ fontSize:"clamp(1.8rem,4vw,2.8rem)", fontWeight:800, color:"#fff", marginBottom:10 }}>{title}</h1><p style={{ fontSize:16, color:"rgba(255,255,255,0.5)" }}>{subtitle}</p></div>;
+    }
+
+    function BottomNav({ activeSection, setActiveSection }) {
+      const items = ["Home","Explore","Learn","Simulator","Quiz"];
+      return (
+        <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, background:"rgba(3,7,18,0.95)", borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", justifyContent:"space-around", padding:"12px 0" }}>
+          {items.map(item => (
+            <button key={item} onClick={()=>setActiveSection(item)} style={{ background:"none", border:"none", color: activeSection===item ? COLORS.purple : "rgba(255,255,255,0.4)", cursor:"pointer", fontSize:12, fontWeight: activeSection===item?600:400 }}>{item}</button>
+          ))}
+        </div>
+      );
+    }
+
+    function App() {
+      const [activeSection, setActiveSection] = useState("Home");
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => { const t = setTimeout(() => setLoading(false), 1500); return () => clearTimeout(t); }, []);
+
+      if (loading) return (
+        <div style={{ position:"fixed", inset:0, background:COLORS.bg, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+          <StarField />
+          <div style={{ fontSize:64, marginBottom:16, display:"inline-block" }}>🪐</div>
+          <h1 style={{ color:COLORS.purple, fontFamily:"sans-serif" }}>Exoplanet Explorer</h1>
+          <p style={{ color:"#666" }}>INITIALIZING...</p>
+        </div>
+      );
+
+      const sections = { Home:HeroSection, Explore:ExploreSection, Learn:LearnSection, Simulator:SimulatorSection, Quiz:QuizSection, Stats:StatsSection, About:AboutSection };
+      const ActiveSection = sections[activeSection] || HeroSection;
+
+      return (
+        <div style={{ background:COLORS.bg, minHeight:"100vh", position:"relative", paddingBottom:80 }}>
+          <StarField />
+          <NavBar activeSection={activeSection} setActiveSection={setActiveSection} />
+          <main style={{ paddingTop:64, position:"relative", zIndex:1 }}>
+            <ActiveSection setActiveSection={setActiveSection} />
+          </main>
+          <BottomNav activeSection={activeSection} setActiveSection={setActiveSection} />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
